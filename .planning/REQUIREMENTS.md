@@ -117,10 +117,52 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements. Each v1 REQ-ID maps to exactly one phase.
 
-(Filled in by gsd-roadmapper after roadmap is created.)
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FOUND-01 | Phase 1 — Foundations | Pending |
+| FOUND-02 | Phase 1 — Foundations | Pending |
+| FOUND-03 | Phase 1 — Foundations | Pending |
+| FOUND-04 | Phase 1 — Foundations | Pending |
+| FOUND-05 | Phase 1 — Foundations | Pending |
+| SCAN-01 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| SCAN-02 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| SCAN-03 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| SCAN-04 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| HEAL-01 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| HEAL-02 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| HEAL-04 | Phase 2 — Scanning + Health Probes + BSSID Data Model | Pending |
+| HEAL-03 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| DEC-01 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| DEC-02 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| DEC-03 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| DEC-04 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| DEC-05 | Phase 3 — Pure Scoring + Hysteresis Engine | Pending |
+| OBS-01 | Phase 4 — Live Decision Loop (Observe-only) | Pending |
+| OBS-02 | Phase 4 — Live Decision Loop (Observe-only) | Pending |
+| OBS-03 | Phase 4 — Live Decision Loop (Observe-only) | Pending |
+| SW-01 | Phase 5 — Active Switching + Manual-Join Respect | Pending |
+| SW-02 | Phase 5 — Active Switching + Manual-Join Respect | Pending |
+| SW-03 | Phase 5 — Active Switching + Manual-Join Respect | Pending |
+| SW-04 | Phase 5 — Active Switching + Manual-Join Respect | Pending |
+| SW-05 | Phase 5 — Active Switching + Manual-Join Respect | Pending |
+| UI-01 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| UI-02 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| UI-03 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| UI-04 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| UI-05 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| UI-06 | Phase 6 — GUI MVP (MenuBarExtra + Main Window + Settings) | Pending |
+| BG-01 | Phase 7 — Background Persistence (Login Item + SwiftData) | Pending |
+| BG-02 | Phase 7 — Background Persistence (Login Item + SwiftData) | Pending |
+| BG-03 | Phase 7 — Background Persistence (Login Item + SwiftData) | Pending |
+| BG-04 | Phase 7 — Background Persistence (Login Item + SwiftData) | Pending |
+| BG-05 | Phase 7 — Background Persistence (Login Item + SwiftData) | Pending |
+| DIST-01 | Phase 8 — Distribution | Pending |
+| DIST-02 | Phase 8 — Distribution | Pending |
+
+**Coverage verification:** 39 / 39 v1 requirements mapped to exactly one phase. No orphans, no duplicates.
 
 ---
 *Requirements defined: 2026-05-12*
-*Last updated: 2026-05-12 after initial definition*
+*Last updated: 2026-05-12 after roadmap creation (traceability filled by gsd-roadmapper)*
