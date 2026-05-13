@@ -3,7 +3,7 @@
 # `make app` is the everyday target: it produces a launchable .app bundle in dist/.
 # `make release` produces a notarized DMG (requires Developer ID + notarytool profile).
 
-.PHONY: build test app run release sign notarize dmg clean help
+.PHONY: build test app run release sign notarize dmg distribute clean help
 
 help:
 	@echo "Common targets:"
@@ -11,6 +11,7 @@ help:
 	@echo "  make test       — run Swift Testing suites"
 	@echo "  make app        — build and assemble a launchable .app in dist/"
 	@echo "  make run        — make app, then open it"
+	@echo "  make distribute — make app, then zip into dist/auto-wifi.zip for sharing"
 	@echo
 	@echo "Release pipeline (requires DEVELOPER_ID_APPLICATION + notary profile):"
 	@echo "  make sign       — re-sign dist/auto-wifi.app with Developer ID"
@@ -43,6 +44,13 @@ notarize:
 
 dmg:
 	./Scripts/make-dmg.sh
+
+distribute: app
+	@echo "▸ Zipping dist/auto-wifi.app for distribution…"
+	@rm -f dist/auto-wifi.zip
+	@cd dist && ditto -c -k --keepParent auto-wifi.app auto-wifi.zip
+	@echo "✓ dist/auto-wifi.zip ready to share ($$(du -sh dist/auto-wifi.zip | cut -f1))"
+	@echo "  Tell recipients to read README.md for install steps."
 
 release: app-release sign notarize dmg
 	@echo

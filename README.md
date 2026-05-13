@@ -1,101 +1,204 @@
 # auto-wifi
 
-A native macOS app that intelligently auto-switches between known Wi-Fi networks using **signal strength + measured throughput with hysteresis**, and explains every decision it makes in a transparent log.
+> A macOS app that intelligently auto-switches between your known Wi-Fi networks — and explains every decision it makes.
 
-**Status:** Phase 1 of 8 (Foundations). The current build is a read-only inspector that asks for Location Services authorization and shows your current connection plus every nearby known network. Active switching, the scoring engine, and the menubar surface ship in later phases.
+macOS's built-in Wi-Fi auto-join is opaque, slow, and prefers the most-recently-joined network over the genuinely best one. **auto-wifi** continuously measures signal strength *and* real connection health across every known network in range, and switches to the best-performing one — with multi-layer hysteresis to prevent the flapping that a naive "highest RSSI wins" implementation would cause. Every decision (and every *rejected* would-be switch) is logged with a plain-language reason.
 
-## Why this exists
+```
+Engine state: STEADY                                    OBSERVE
+Last decision: STAY · current 'HomeWiFi-5G' at -54 dBm is above good-enough threshold (-67 dBm); not considering switch
+```
 
-macOS's built-in Wi-Fi auto-join sticks with weak or dead networks and is slow to fall back to a stronger known one. There's no user-visible reason for any decision it makes. `auto-wifi` is designed to:
+---
 
-1. **Pick the genuinely best known network** in range — not just the one with the highest signal, but the one with the best measured health (latency + DNS reachability + packet loss).
-2. **Never flap** between two near-equal networks — multi-layer hysteresis (EMA smoothing, threshold bands, dwell timers, post-switch cooldown) prevents oscillation.
-3. **Explain every switch** — the decision log records why every transition happened, *and* why every rejected switch was rejected. This is the centerpiece, both as a debugging tool and as the portfolio storytelling artifact.
+## Status
 
-The full design is documented in `.planning/`:
-- [`PROJECT.md`](.planning/PROJECT.md) — vision, constraints, key decisions
-- [`REQUIREMENTS.md`](.planning/REQUIREMENTS.md) — 39 v1 requirements
-- [`ROADMAP.md`](.planning/ROADMAP.md) — 8 build phases
-- [`research/SUMMARY.md`](.planning/research/SUMMARY.md) — stack, features, architecture, and pitfalls research
+This is a personal/portfolio build. **Default mode is "Observe"** — the engine runs continuously and logs decisions but does not actually switch networks until you explicitly flip the toggle to "On".
 
-## Phase 1 scope
+- v0.1 — phases 1-7 complete (foundations, scanning, health probes, hysteresis algorithm, observe loop, switching, GUI, persistence)
+- v0.2 — phase 8 (signed/notarized DMG distribution) pending an Apple Developer Program membership
 
-This build delivers the five Foundations requirements (FOUND-01 through FOUND-05):
+---
 
-- Launches as a proper signed `.app` bundle
-- Requests Location Services authorization with an in-app explanation of *why* macOS requires it for Wi-Fi metadata
-- Shows a remediation banner with a one-click deep-link to System Settings if Location is denied or revoked
-- Reads the system's saved Wi-Fi networks via `CWConfiguration.networkProfiles` and intersects them against a live scan, so you see exactly which of your known networks are currently in range and their RSSI / band / channel
-- Built with Swift 6.2 + SwiftUI + CoreWLAN + CoreLocation — no deprecated APIs (no `airport`, no `SMJobBless`, no `SCNetworkReachability`)
+## What it does
 
-Phase 2+ layer continuous health probes, the hysteresis scoring engine, the live decision loop, active switching, the menubar interface, background persistence, and the notarized distribution flow on top.
+**Composite scoring.** Every nearby known Wi-Fi network gets a composite score combining:
 
-## Requirements
+| Input | Source | Notes |
+| --- | --- | --- |
+| RSSI (signal strength) | CoreWLAN scan | Smoothed via exponential moving average (α=0.3) so a single noisy sample can't flip the decision |
+| Latency + DNS health | Network framework probes | Only sampled for the *currently-connected* network — nearby APs don't reveal their backhaul quality |
+| Captive-portal flag | `captive.apple.com` after association | Probed once per `(SSID, BSSID)` and remembered; large negative score modifier |
+| Band preference | Channel data | Small bonus for 5 GHz and 6 GHz |
+| User preference | You, in Settings → Networks | Prefer / Neutral / Avoid / Never-auto-join |
 
-- macOS 14 (Sonoma) or newer — your current Mac (`sw_vers`) must be 14.0+
-- Swift 6.0+ (Command Line Tools or full Xcode both work for `make app`)
-- Full **Xcode** is only required for `make release` (notarization needs `xcrun notarytool`)
+**Multi-layer hysteresis.** Five independent gates prevent flapping:
 
-## Build
+1. **EMA smoothing** of RSSI samples — a single bad reading doesn't trigger anything.
+2. **Threshold bands** — current connection above −67 dBm is "good enough" and no switch is even considered, even if a competitor looks marginally better. Below −75 dBm starts the degrade timer.
+3. **Degrade dwell timer** — the current connection must stay weak for 10 continuous seconds before alternatives are evaluated.
+4. **Candidate dwell timer** — a candidate must look meaningfully better for 8 continuous seconds before we commit.
+5. **Post-switch cooldown** — 30 seconds frozen after a switch so the new connection can settle.
 
-The everyday loop is `make app` + `make run`:
+Plus a 2× margin multiplier when active traffic is detected (large transfers, Zoom calls), so the engine won't kick you mid-meeting for a marginal improvement.
+
+**Transparent decision log.** Every evaluation cycle produces a structured `Decision` event including switches considered and rejected — and *why* they were rejected:
+
+```
+SWITCH  switching: 'Cafe-5G' (+18.7) sustained +21.3-point advantage over 'HomeWiFi' (-2.6) for 8s
+REJECT  candidate 'Cafe-5G' only +6.0 points better than current (need +15.0); short by +9.0
+COOLDOWN  post-switch cooldown: 23s remaining
+GOOD    current 'HomeWiFi-5G' at -54.3 is above good-enough threshold (-67 dBm); not considering switch
+```
+
+---
+
+## Installing (for tech-savvy testers)
+
+> ⚠ This build is **ad-hoc signed** — macOS Gatekeeper will show a warning on first launch and the system Location prompt will not appear automatically. The notarized v0.2 release will fix both issues. Until then:
+
+### One-time setup
+
+1. **Download.** Get the `auto-wifi.zip` from whoever sent you this. Double-click to extract — you get `auto-wifi.app`.
+2. **Move to Applications.** Drag `auto-wifi.app` into `/Applications/`. This is required — macOS will not grant Location Services authorization to apps run from arbitrary directories.
+3. **First launch.** Right-click the app in `/Applications/` → **Open** → confirm the Gatekeeper warning.
+4. **Open the main window.** It'll appear automatically on first launch; click **Continue**.
+5. **Grant Location.** The system prompt may not appear (TCC silently suppresses prompts for ad-hoc-signed apps). If you don't see one:
+   - Open **System Settings → Privacy & Security → Location Services**
+   - Find **auto-wifi** in the list, toggle it **on**
+   - This is *required* — macOS hides Wi-Fi network names (SSIDs and BSSIDs) from any app that doesn't have Location auth. The inspector will look empty until you grant.
+6. **Done.** The app lives in your menubar from now on (look for a wifi icon next to your network name at the top-right of your screen). The main window can be closed; the app keeps running.
+
+> **Why does it need Location?** macOS treats nearby Wi-Fi network names as location data — public BSSID-to-coordinates databases mean a list of nearby APs reveals where you are with meter-level accuracy. Apple gates that data behind Location Services. auto-wifi never logs, stores, or transmits your geographic location — the permission only unlocks Wi-Fi metadata. [More on this](https://developer.apple.com/forums/thread/748518).
+
+### Using it
+
+- **Menubar icon** shows your current SSID and a status glyph: 📶 steady, ⚠️ degraded, 🔄 switching, ⏳ cooldown.
+- Click the icon for the panel: **Auto-switch** toggle (Off / Observe / On — defaults to Observe), **Pause for N minutes** buttons, "Open main window," "Settings…", "Quit."
+- **Default mode is Observe.** The engine runs and logs decisions, but never actually switches networks. Run for a few days, look at the decision log, then flip to "On" when you trust it.
+- The **main window** shows your current connection, live health metrics, the scoring table for nearby known networks, and the live decision log with filters (All / Switches / Rejected / Errors).
+- **Settings → Algorithm** shows the read-only hysteresis thresholds. **Settings → Networks** lets you tag a specific SSID as Prefer / Avoid / Never-auto-join. **Settings → Background** lets you enable login-item registration so it starts automatically.
+
+### Validating that it works
+
+After running in **Observe** mode for a day or two of normal use, inspect the decision log:
 
 ```sh
-make app    # build dist/auto-wifi.app
-make run    # build and open the app
+tail -50 ~/Library/Application\ Support/auto-wifi/decisions.jsonl | python3 -m json.tool --json-lines
 ```
 
-`make app` runs `swift build` and then `Scripts/make-app.sh`, which assembles the SwiftPM-built binary into a proper `Contents/MacOS/AutoWiFi` bundle with `Info.plist` (containing the required `NSLocation*UsageDescription` keys) and entitlements, ad-hoc codesigned with the hardened runtime so Location Services authorization works.
+| Signal | Means |
+| --- | --- |
+| Mostly `stayCurrentGoodEnough` while on a strong network | Algorithm isn't being trigger-happy ✓ |
+| `rejectedSwitch` near network edges with multiple known APs visible | Hysteresis is doing its job ✓ |
+| FSM transitions `steady → degraded → steady` as signal fluctuates | State machine is tracking reality ✓ |
+| `switchTo` entries clustering when you actually moved | Algorithm is detecting real changes ✓ |
+| `switchTo` entries when nothing changed for you | Calibration is off — let me know |
+| Same two networks ping-ponging in the log | Hysteresis is broken — definitely let me know |
 
-> **Why this is hand-built and not an `.xcodeproj`.** macOS Location Services requires a real `.app` bundle with a stable bundle identifier — a bare `swift run` executable cannot get authorization. Until Xcode is installed, this Makefile + script approach produces a launchable bundle. When you install Xcode you can either keep this layout or generate an `.xcodeproj` via `xcodegen`.
-
-## Release pipeline
-
-The full notarized release flow is wired into the Makefile but requires:
-
-- A **Developer ID Application** signing identity in your login keychain (`security find-identity -v -p codesigning`)
-- A **notarytool keychain profile** stored once with:
-  ```sh
-  xcrun notarytool store-credentials AutoWiFiNotarization \
-    --apple-id YOUR_APPLE_ID \
-    --team-id YOUR_TEAM_ID \
-    --password "app-specific-password"
-  ```
-
-Then:
+### Uninstalling
 
 ```sh
-DEVELOPER_ID_APPLICATION="Developer ID Application: Aarnav Koushik (TEAMID)" \
-  make release
+# Quit from the menubar first, then:
+rm -rf /Applications/auto-wifi.app
+rm -rf ~/Library/Application\ Support/auto-wifi
+# Settings → Privacy & Security → Location Services → toggle auto-wifi off (or just delete the entry)
+# Settings → General → Login Items → remove auto-wifi if you enabled it
 ```
 
-This runs `app-release` → `sign` → `notarize` → `dmg` and produces `dist/auto-wifi.dmg` ready to drag-install on any Mac.
+---
 
-## Layout
+## Sharing data back
 
-```
-auto-wifi/
-├── Package.swift                 # SwiftPM manifest, macOS 14+, Swift 6
-├── Makefile                      # build / app / run / sign / notarize / release / dmg
-├── README.md                     # ← you are here
-├── Resources/
-│   ├── Info.plist                # bundle metadata + NSLocation*UsageDescription
-│   └── AutoWiFi.entitlements     # hardened-runtime entitlements
-├── Scripts/
-│   ├── make-app.sh               # wrap SwiftPM binary in .app
-│   ├── sign.sh                   # Developer ID resign
-│   ├── notarize.sh               # notarytool submit + stapler
-│   └── make-dmg.sh               # hdiutil DMG
-├── Sources/
-│   ├── AutoWiFi/                 # @main SwiftUI app, views, controllers
-│   ├── Algorithms/               # pure-logic scoring + hysteresis (populated in Phase 3)
-│   └── Core/                     # shared models — WiFiBand, KnownNetwork, ScanResult, Candidate
-└── .planning/                    # planning artifacts (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, research/)
+If you've run for a few days and want to send your decision log back for analysis:
+
+```sh
+# A copy of every Decision the engine made, 90 days max
+cp ~/Library/Application\ Support/auto-wifi/decisions.jsonl ~/Desktop/auto-wifi-decisions.jsonl
 ```
 
-## Next phase
+The JSONL contains: timestamps, action kinds (`stay` / `switchTo` / `rejectedSwitch` / etc.), human-readable reasons, the current/target SSID + BSSID, and the FSM state after each decision. **No location data, no traffic content, no passwords.** SSIDs and BSSIDs are technically identifiers but everything else lives in your own JSONL file on your own machine.
 
-Phase 2 — Scanning + Health Probes + BSSID Data Model. The first step there is an empirical CoreWLAN spike on macOS 14.4+ to nail down four open questions (scan rate-limits, `associate(...)` with `nil` for Enterprise SSIDs, `scanCacheUpdated` reliability when the app is not frontmost, SMAppService Info.plist requirements) — see `.planning/STATE.md` "Blockers/Concerns".
+---
+
+## Building from source
+
+Requires macOS 14+ and Swift 6.0+ (ships with the Xcode Command Line Tools).
+
+```sh
+git clone <repo-url> auto-wifi
+cd auto-wifi
+make app                                # builds dist/auto-wifi.app
+make test                               # runs the 17 algorithm tests
+open dist/auto-wifi.app                 # or copy to /Applications first
+```
+
+### Build pipeline
+
+| Target | What it does |
+| --- | --- |
+| `make build` | `swift build` only |
+| `make test` | runs `AlgorithmsRunner` (17 synthetic-input tests) |
+| `make app` | builds + assembles a launchable `.app` in `dist/` (ad-hoc signed, hardened runtime) |
+| `make run` | `make app` + opens the app |
+| `make distribute` | builds + zips into `dist/auto-wifi.zip` for sharing |
+| `make sign` | re-signs with Developer ID (requires `DEVELOPER_ID_APPLICATION` env var) |
+| `make notarize` | submits to Apple notarization service + staples (requires `notarytool` keychain profile) |
+| `make dmg` | wraps the signed/notarized app into a DMG |
+| `make release` | full pipeline: build → sign → notarize → DMG |
+
+---
+
+## Architecture
+
+```
+            ┌──────────────────────────────────────────────────┐
+            │                   AppState                       │
+            │      @MainActor @Observable, owns everything     │
+            └──────────────────────────────────────────────────┘
+                              │
+       ┌──────────────┬───────┴──────┬─────────────┬───────────┬───────────────┐
+       ▼              ▼              ▼             ▼           ▼               ▼
+  ScanCoordinator  HealthProbe   CaptiveProbe   GuardState  TrafficWatcher  DecisionLoop ──▶ SwitchActor
+   (CoreWLAN +      (Network       (URL probe    (pause +    (getifaddrs    (pure engine +    (CWInterface
+   adaptive         framework      to Apple)     manual       byte rates)    + persistence       associate)
+   cadence)         + ping/DNS)                  hold)                       sink)
+                                                                                  │
+                                                                                  ▼
+                                                                          PersistenceActor
+                                                                          (JSONL on disk)
+                                                                                  │
+                                                                                  ▼
+                                                                            Algorithms
+                                                                          (pure-Swift,
+                                                                           zero framework
+                                                                            imports)
+```
+
+The `Algorithms` module is **framework-free** — no CoreWLAN, no Network framework, no AppKit, no SwiftUI imports. The hysteresis math is `(state, inputs) -> (state', decision)` and is exercised entirely with synthetic inputs in `swift run AlgorithmsRunner`.
+
+Built with: Swift 6.2, SwiftUI, CoreWLAN, CoreLocation, Network, ServiceManagement, OSLog. Targets macOS 14+ (Sonoma). No third-party dependencies.
+
+---
+
+## Roadmap
+
+- ✅ **Phase 1** — Signed `.app` shell with Location Services authorization and CoreWLAN read of known networks
+- ✅ **Phase 2** — Continuous scanning + ping/DNS health probes + captive portal detection + BSSID-keyed data model
+- ✅ **Phase 3** — Pure scoring + multi-layer hysteresis engine (17 synthetic-input tests)
+- ✅ **Phase 4** — Observe-only decision loop with filterable in-app log
+- ✅ **Phase 5** — Active switching + manual-join respect + active-traffic awareness + pause controls
+- ✅ **Phase 6** — `MenuBarExtra` + Settings scene with per-network preferences (`LSUIElement`)
+- ✅ **Phase 7** — `SMAppService.loginItem` background registration + JSON persistence + 90-day decision-log rollover
+- ⏳ **Phase 8** — Developer ID signing + notarization + DMG (pending $99/year Apple Developer Program enrollment)
+
+v2 ideas: editable hysteresis thresholds in the UI, throughput sampling beyond ping/DNS, opt-in switch notifications, Sparkle auto-update, Homebrew Cask distribution, SwiftUI Charts visualization of score-over-time.
+
+---
+
+## Acknowledgments
+
+Algorithm design draws on standard Wi-Fi roaming literature (Cisco/Juniper/Meraki engineering docs on RSSI hysteresis and sticky-client mitigation) and the actor-per-concern macOS architecture pattern. macOS Location Services / CoreWLAN integration follows the conventions laid out in Apple Developer Forums threads on Sonoma 14.4+ SSID redaction behavior.
 
 ---
 
