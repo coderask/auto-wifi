@@ -18,10 +18,12 @@ struct SettingsView: View {
                 .tabItem { Label("Algorithm", systemImage: "function") }
             NetworkPreferencesTab()
                 .tabItem { Label("Networks", systemImage: "list.bullet") }
+            BackgroundTab()
+                .tabItem { Label("Background", systemImage: "moon.fill") }
             AboutTab()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }
-        .frame(width: 560, height: 460)
+        .frame(width: 580, height: 480)
     }
 }
 
@@ -114,7 +116,7 @@ private struct NetworkPreferencesTab: View {
                     .font(.headline)
                 Spacer()
                 if !state.networkPreferences.isEmpty {
-                    Button("Clear all") { state.networkPreferences.removeAll() }
+                    Button("Clear all") { state.clearAllPreferences() }
                         .controlSize(.small)
                 }
             }

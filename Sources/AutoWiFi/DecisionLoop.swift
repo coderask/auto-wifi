@@ -34,6 +34,11 @@ public final class DecisionLoop {
     /// so the loop has no direct dependency on AppState.
     public var preferencesProvider: () -> [String: NetworkPreference] = { [:] }
 
+    /// Closure invoked for every Decision the loop produces (BG-03). AppState wires this to
+    /// PersistenceActor so all decisions land on disk. The closure must be Sendable because
+    /// it's likely to hop to a detached Task for the actual write.
+    public var persistenceSink: (@Sendable (Decision) -> Void)?
+
     /// Live `(SSID, BSSID)` of the previous tick. We use this to detect manual joins:
     /// a link change with no corresponding recent `SwitchActor` attempt is the user joining
     /// a network themselves (SW-02).
@@ -240,6 +245,7 @@ public final class DecisionLoop {
         if log.count > Self.maxInMemoryLog {
             log.removeFirst(log.count - Self.maxInMemoryLog)
         }
+        persistenceSink?(d)
     }
 
     private func scanCadence(for fsm: DecisionState.FSM) -> ScanCoordinator.Cadence {

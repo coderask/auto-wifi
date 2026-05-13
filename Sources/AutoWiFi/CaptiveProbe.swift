@@ -47,6 +47,12 @@ public actor CaptiveProbe {
         return verdicts[Key(ssid: ssid, bssid: bssid)]
     }
 
+    /// Inject a previously-observed verdict (e.g., loaded from persistence on launch) so
+    /// we don't re-probe the network on first connect.
+    public func seedVerdict(ssid: String, bssid: String?, captive: Bool, observedAt: Date) {
+        verdicts[Key(ssid: ssid, bssid: bssid)] = Verdict(captive: captive, observedAt: observedAt)
+    }
+
     private func runProbe() async -> Bool {
         var request = URLRequest(url: Self.probeURL)
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
