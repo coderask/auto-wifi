@@ -39,7 +39,7 @@ When multiple known WiFi networks are in range, the user is always on the genuin
 
 ## Context
 
-- **Owner:** Aarnav Krishnan (single developer, personal use + portfolio).
+- **Owner:** Aarnav Koushik (single developer, personal use + portfolio).
 - **Frustration that prompted this:** macOS sticks with the wrong WiFi network — it stays on weak/dead networks instead of switching to a stronger known one nearby, and is slow to fall back. This is a recurring annoyance in environments with overlapping networks (home with multiple APs, office, coffee shops with multiple known SSIDs in range).
 - **Why hysteresis matters:** A naive "switch to highest RSSI" implementation flaps endlessly between two near-equal networks. Hysteresis (require *meaningful* improvement before switching, and require *sustained* degradation before abandoning the current one) is the core technical interest of the project.
 - **Portfolio framing:** The app should look and feel polished — clean SwiftUI interface, observable internal state, well-explained decisions. The decision log is both a debugging tool and a showcase of the thinking behind the algorithm.

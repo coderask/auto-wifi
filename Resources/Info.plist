@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>auto-wifi</string>
+	<key>CFBundleExecutable</key>
+	<string>AutoWiFi</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.aarnavkoushik.autowifi</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>auto-wifi</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Aarnav Koushik. All rights reserved.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocationUsageDescription</key>
+	<string>auto-wifi reads nearby Wi-Fi networks so it can pick the best known one. macOS requires Location access to expose Wi-Fi network names.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>auto-wifi reads nearby Wi-Fi networks to detect when a better known network is available. macOS gates Wi-Fi network names behind Location authorization.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>auto-wifi monitors nearby Wi-Fi networks continuously — including in the background — so it can switch you to a better known network as conditions change. macOS gates Wi-Fi network names behind Location authorization.</string>
+</dict>
+</plist>

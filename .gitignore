@@ -1,0 +1,15 @@
+.DS_Store
+.build/
+.swiftpm/
+Packages/
+*.xcodeproj
+*.xcworkspace
+build/
+dist/
+*.app
+*.dmg
+.derivedData/
+
+# Notarization secrets (never commit credentials)
+.notarytool-keychain-profile
+secrets.env

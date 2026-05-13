@@ -1,0 +1,67 @@
+import SwiftUI
+
+/// FOUND-02: explain *why* before triggering the macOS Location prompt.
+struct PermissionOnboardingView: View {
+    @Environment(LocationAuthManager.self) private var auth
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "wifi.circle.fill")
+                .resizable()
+                .frame(width: 80, height: 80)
+                .foregroundStyle(.tint)
+
+            Text("Welcome to auto-wifi")
+                .font(.largeTitle.weight(.semibold))
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("auto-wifi keeps you on the best known Wi-Fi network in range — and explains every switch it makes.")
+                    .font(.title3)
+                    .multilineTextAlignment(.leading)
+
+                Divider()
+
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Location Services access is required")
+                            .font(.headline)
+                        Text("macOS gates the names of nearby Wi-Fi networks behind Location Services. Without it, auto-wifi cannot see which networks are around you.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "location.fill")
+                        .foregroundStyle(.tint)
+                        .frame(width: 24)
+                }
+
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Your location is never collected")
+                            .font(.headline)
+                        Text("auto-wifi never logs, transmits, or stores your geographic location. The permission unlocks Wi-Fi metadata only.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "lock.shield.fill")
+                        .foregroundStyle(.tint)
+                        .frame(width: 24)
+                }
+            }
+            .frame(maxWidth: 520)
+
+            Button {
+                auth.requestAuthorization()
+            } label: {
+                Text("Continue")
+                    .frame(maxWidth: 200)
+            }
+            .controlSize(.large)
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
