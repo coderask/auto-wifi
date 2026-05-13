@@ -46,11 +46,14 @@ dmg:
 	./Scripts/make-dmg.sh
 
 distribute: app
-	@echo "▸ Zipping dist/auto-wifi.app for distribution…"
+	@echo "▸ Packaging for distribution…"
 	@rm -f dist/auto-wifi.zip
 	@cd dist && ditto -c -k --keepParent auto-wifi.app auto-wifi.zip
-	@echo "✓ dist/auto-wifi.zip ready to share ($$(du -sh dist/auto-wifi.zip | cut -f1))"
-	@echo "  Tell recipients to read README.md for install steps."
+	@./Scripts/make-dmg.sh
+	@echo
+	@echo "✓ dist/auto-wifi.dmg ($$(du -sh dist/auto-wifi.dmg | cut -f1)) — drag-to-Applications install, standard Mac flow"
+	@echo "✓ dist/auto-wifi.zip ($$(du -sh dist/auto-wifi.zip | cut -f1)) — for AirDrop / direct send"
+	@echo "  Tell recipients to read README.md for first-launch steps (right-click→Open, manual Location grant)."
 
 release: app-release sign notarize dmg
 	@echo

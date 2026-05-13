@@ -59,9 +59,13 @@ GOOD    current 'HomeWiFi-5G' at -54.3 is above good-enough threshold (-67 dBm);
 
 ### One-time setup
 
-1. **Download.** Get the `auto-wifi.zip` from whoever sent you this. Double-click to extract — you get `auto-wifi.app`.
-2. **Move to Applications.** Drag `auto-wifi.app` into `/Applications/`. This is required — macOS will not grant Location Services authorization to apps run from arbitrary directories.
-3. **First launch.** Right-click the app in `/Applications/` → **Open** → confirm the Gatekeeper warning.
+1. **Download.** Get `auto-wifi.dmg` (or `auto-wifi.zip` if that's what you were sent).
+2. **Install.**
+   - **From the DMG** (recommended): double-click → drag `auto-wifi.app` onto the Applications shortcut → eject the disk image.
+   - **From the zip**: double-click to extract → drag `auto-wifi.app` into `/Applications/` yourself.
+
+   Moving to `/Applications/` is required either way — macOS will not grant Location Services authorization to apps run from arbitrary directories.
+3. **First launch.** Right-click `auto-wifi` in `/Applications/` → **Open** → confirm the Gatekeeper warning (it appears because the build isn't notarized yet; future v0.2+ will skip this step).
 4. **Open the main window.** It'll appear automatically on first launch; click **Continue**.
 5. **Grant Location.** The system prompt may not appear (TCC silently suppresses prompts for ad-hoc-signed apps). If you don't see one:
    - Open **System Settings → Privacy & Security → Location Services**
