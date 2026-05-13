@@ -4,15 +4,17 @@ import OSLog
 import Core
 import Algorithms
 
-/// Top-level @Observable owned by the SwiftUI app. Aggregates the long-running components
-/// (scanning, health probing, captive detection, decision loop) and exposes their state to
-/// the views. Phase 5 layers SwitchActor on top via DecisionLoop.onSwitchRequested.
+/// Top-level @Observable owned by the SwiftUI app. Owns every long-running component and
+/// wires them together. Phase 5 adds GuardState + TrafficWatcher + SwitchActor (via the
+/// DecisionLoop).
 @MainActor
 @Observable
 public final class AppState {
     public let scan = ScanCoordinator()
     public let health = HealthProbe()
     public let captive = CaptiveProbe()
+    public let traffic = TrafficWatcher()
+    public let guards = GuardState()
     public let decisions = DecisionLoop()
 
     public private(set) var isRunning = false
@@ -23,7 +25,7 @@ public final class AppState {
     private let log = Logger(subsystem: "com.aarnavkoushik.autowifi", category: "AppState")
 
     public init() {
-        decisions.attach(scan: scan, health: health, captive: captive)
+        decisions.attach(scan: scan, health: health, captive: captive, guards: guards, traffic: traffic)
     }
 
     public func start() async {
@@ -32,6 +34,7 @@ public final class AppState {
         log.info("AppState starting")
         await scan.start()
         health.start()
+        traffic.start()
         decisions.start()
         captiveTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -46,6 +49,7 @@ public final class AppState {
         isRunning = false
         scan.stop()
         health.stop()
+        traffic.stop()
         decisions.stop()
         captiveTask?.cancel()
         captiveTask = nil
@@ -55,6 +59,17 @@ public final class AppState {
         await scan.refreshNow()
         await maybeProbeCaptive(force: true)
         await decisions.tickOnce()
+    }
+
+    /// One-click "stop touching my Wi-Fi for N minutes" (SW-03). Phase 6's menubar surfaces
+    /// this; for now the inspector wires a button.
+    public func pauseAutoSwitch(for duration: TimeInterval) {
+        guards.pause(for: duration)
+    }
+
+    public func clearAllHolds() {
+        guards.clearManualHold()
+        guards.clearPause()
     }
 
     private func maybeProbeCaptive(force: Bool = false) async {

@@ -16,6 +16,7 @@ struct InspectorView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     FSMBanner()
+                    HoldBanner()
                     CurrentConnectionCard()
                     HealthCard()
                     LastDecisionCard()
@@ -27,6 +28,39 @@ struct InspectorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct HoldBanner: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        if state.guards.isHeld {
+            HStack(spacing: 12) {
+                Image(systemName: "hand.raised.fill").foregroundStyle(.yellow).imageScale(.large)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Auto-switching suspended")
+                        .font(.headline)
+                    Text(state.guards.holdReason ?? "")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Resume") { state.clearAllHolds() }
+                    .controlSize(.small)
+            }
+            .padding(12)
+            .background(Color.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        } else {
+            HStack(spacing: 8) {
+                Spacer()
+                Text("Pause auto-switching for:")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("5 min") { state.pauseAutoSwitch(for: 5 * 60) }.controlSize(.small)
+                Button("30 min") { state.pauseAutoSwitch(for: 30 * 60) }.controlSize(.small)
+                Button("2 hr") { state.pauseAutoSwitch(for: 2 * 60 * 60) }.controlSize(.small)
+            }
+        }
     }
 }
 
