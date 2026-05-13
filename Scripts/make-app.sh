@@ -39,6 +39,17 @@ chmod +x "$APP/Contents/MacOS/$EXECUTABLE_NAME"
 
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
+# Icon assets — regenerate if missing, then copy into Contents/Resources/.
+# AppIcon.icns gives us the Dock / Finder / Mission Control icon.
+# MenuBarIcon.png + @2x is the custom template image for the menubar status item.
+if [[ ! -f "$ROOT/Resources/Icons/AppIcon.icns" ]]; then
+  echo "▸ Generating icon assets (one-time)…"
+  "$ROOT/Scripts/make-icons.sh"
+fi
+cp "$ROOT/Resources/Icons/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+cp "$ROOT/Resources/Icons/MenuBarIcon.png" "$APP/Contents/Resources/MenuBarIcon.png"
+cp "$ROOT/Resources/Icons/MenuBarIcon@2x.png" "$APP/Contents/Resources/MenuBarIcon@2x.png"
+
 # A bundle without PkgInfo is technically valid but Finder/launchd are happier with it.
 echo -n "APPL????" > "$APP/Contents/PkgInfo"
 

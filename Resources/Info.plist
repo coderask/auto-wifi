@@ -8,6 +8,8 @@
 	<string>auto-wifi</string>
 	<key>CFBundleExecutable</key>
 	<string>AutoWiFi</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.aarnavkoushik.autowifi</string>
 	<key>CFBundleInfoDictionaryVersion</key>

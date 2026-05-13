@@ -190,14 +190,21 @@ private struct ActionsRow: View {
     }
 }
 
-/// Title of the MenuBarExtra in the system menubar. Uses a system icon so the title isn't
-/// dependent on a custom asset (which would need an asset catalog).
+/// Title of the MenuBarExtra in the system menubar. Uses the custom MenuBarIcon template
+/// image as the brand mark; state is conveyed through an SF Symbol overlay only when the
+/// FSM is in a non-steady state (`degraded` / `switching` / `cooldown` / `off`). In
+/// `.steady` (the common case) only the logo + SSID are visible.
 struct MenuBarTitle: View {
     @Environment(AppState.self) private var state
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: glyph)
+            BrandImage()
+                .frame(width: 18, height: 18)
+            if let overlay = stateOverlayGlyph {
+                Image(systemName: overlay)
+                    .foregroundStyle(stateColor)
+            }
             if let ssid = state.scan.snapshot.currentSSID, !ssid.isEmpty {
                 Text(ssid)
                     .lineLimit(1)
@@ -206,13 +213,36 @@ struct MenuBarTitle: View {
         }
     }
 
-    private var glyph: String {
+    private var stateOverlayGlyph: String? {
         switch state.decisions.engineState.fsm {
-        case .off: "wifi.slash"
-        case .steady: "wifi"
-        case .degraded: "wifi.exclamationmark"
+        case .off: "power.circle.fill"
+        case .steady: nil          // happy path — just the brand
+        case .degraded: "exclamationmark.triangle.fill"
         case .switching: "arrow.triangle.2.circlepath"
         case .cooldown: "hourglass"
         }
+    }
+
+    private var stateColor: Color {
+        switch state.decisions.engineState.fsm {
+        case .off: .secondary
+        case .steady: .primary
+        case .degraded: .orange
+        case .switching: .blue
+        case .cooldown: .yellow
+        }
+    }
+}
+
+/// Loads MenuBarIcon from the .app's Resources and marks it as a template image so macOS
+/// auto-tints it for light/dark menubar appearances. Falls back to the SF Symbol wifi if
+/// the asset is missing (e.g. during early-development `swift run` without the bundle).
+private struct BrandImage: View {
+    var body: some View {
+        if let nsImage = NSImage(named: "MenuBarIcon") {
+            nsImage.isTemplate = true
+            return AnyView(Image(nsImage: nsImage).resizable().scaledToFit())
+        }
+        return AnyView(Image(systemName: "wifi"))
     }
 }
