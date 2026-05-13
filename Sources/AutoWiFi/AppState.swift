@@ -3,54 +3,74 @@ import Observation
 import OSLog
 import Core
 
-/// Top-level @Observable owned by the SwiftUI app. Phases 2+ will inject a real engine here;
-/// for Phase 1 it just owns the last snapshot, the last error, and a "refresh" trigger.
+/// Top-level @Observable owned by the SwiftUI app. Aggregates the long-running components
+/// (scanning, health probing, captive detection) and exposes their state to the views.
+/// Phase 4 will replace the direct composition with a `DecisionLoop` that orchestrates them
+/// through a state machine; for Phase 2 the loop is naïve "do all three on similar cadence."
 @MainActor
 @Observable
 public final class AppState {
-    public private(set) var snapshot: WiFiSnapshot = .empty
-    public private(set) var lastError: String?
-    public private(set) var isRefreshing = false
-    public private(set) var lastRefreshedAt: Date?
+    public let scan = ScanCoordinator()
+    public let health = HealthProbe()
+    public let captive = CaptiveProbe()
 
-    private let inspector = WiFiInspector()
+    public private(set) var isRunning = false
+    public private(set) var captiveVerdict: CaptiveProbe.Verdict?
+    private var captiveTask: Task<Void, Never>?
+    private var lastProbedBSSID: String?
+
     private let log = Logger(subsystem: "com.aarnavkoushik.autowifi", category: "AppState")
-    private var pollingTask: Task<Void, Never>?
 
     public init() {}
 
-    /// Begin a slow background refresh loop so the UI stays warm. Phase 1 uses a naive
-    /// fixed interval — Phase 2 introduces the adaptive scan cadence (per SCAN-01).
-    public func startPolling(every interval: Duration = .seconds(15)) {
-        guard pollingTask == nil else { return }
-        log.info("polling started")
-        pollingTask = Task { [weak self] in
+    public func start() async {
+        guard !isRunning else { return }
+        isRunning = true
+        log.info("AppState starting")
+        await scan.start()
+        health.start()
+        captiveTask = Task { [weak self] in
+            // The captive probe is cheap-ish but not free — only run when the BSSID changes
+            // (i.e., we joined a new AP). Cached per-(SSID,BSSID) verdict avoids re-probing.
             while !Task.isCancelled {
-                await self?.refresh()
-                try? await Task.sleep(for: interval)
+                await self?.maybeProbeCaptive()
+                try? await Task.sleep(for: .seconds(30))
             }
         }
     }
 
-    public func stopPolling() {
-        pollingTask?.cancel()
-        pollingTask = nil
+    public func stop() {
+        log.info("AppState stopping")
+        isRunning = false
+        scan.stop()
+        health.stop()
+        captiveTask?.cancel()
+        captiveTask = nil
     }
 
-    /// One-shot refresh. Safe to call from the UI on a button tap.
-    public func refresh() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-        do {
-            let snap = try await inspector.snapshot()
-            snapshot = snap
-            lastError = nil
-            lastRefreshedAt = Date()
-            log.debug("snapshot: current=\(snap.currentSSID ?? "nil", privacy: .public) known-in-range=\(snap.knownInRange.count, privacy: .public) total=\(snap.allInRange.count, privacy: .public)")
-        } catch {
-            lastError = error.localizedDescription
-            log.error("snapshot failed: \(error.localizedDescription, privacy: .public)")
+    public func refreshNow() async {
+        await scan.refreshNow()
+        await maybeProbeCaptive(force: true)
+    }
+
+    private func maybeProbeCaptive(force: Bool = false) async {
+        let currentSSID = scan.snapshot.currentSSID
+        let currentBSSID = scan.snapshot.currentBSSID
+        guard let currentSSID, !currentSSID.isEmpty else {
+            health.setCaptiveDetected(false)
+            captiveVerdict = nil
+            return
         }
+        // Skip re-probing the same AP unless forced — captive status doesn't flip without a
+        // re-association.
+        if !force, currentBSSID == lastProbedBSSID, let cached = await captive.cachedVerdict(ssid: currentSSID, bssid: currentBSSID) {
+            health.setCaptiveDetected(cached.captive)
+            captiveVerdict = cached
+            return
+        }
+        lastProbedBSSID = currentBSSID
+        let detected = await captive.probeCurrent(ssid: currentSSID, bssid: currentBSSID)
+        health.setCaptiveDetected(detected)
+        captiveVerdict = await captive.cachedVerdict(ssid: currentSSID, bssid: currentBSSID)
     }
 }

@@ -14,18 +14,17 @@ struct AutoWiFiApp: App {
                 .environment(appState)
                 .frame(minWidth: 720, minHeight: 540)
                 .task {
-                    // Phase 1: only poll once authorization is granted. Otherwise the
-                    // first scan returns redacted SSIDs and the table looks broken.
+                    // Only start the long-running scanners once authorization is granted.
+                    // Otherwise scan results return redacted SSIDs and everything looks broken.
                     if auth.state == .authorized {
-                        appState.startPolling()
+                        await appState.start()
                     }
                 }
                 .onChange(of: auth.state) { _, newState in
                     if newState == .authorized {
-                        appState.startPolling()
-                        Task { await appState.refresh() }
+                        Task { await appState.start() }
                     } else {
-                        appState.stopPolling()
+                        appState.stop()
                     }
                 }
         }

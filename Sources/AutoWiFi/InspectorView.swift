@@ -1,8 +1,9 @@
 import SwiftUI
 import Core
 
-/// The main Phase-1 surface: a live readout of the current connection and a table of nearby
-/// known networks. Phases 4-6 layer score/decision-log columns onto this same table.
+/// The main user-facing surface for Phases 1-2: a live readout of the current connection
+/// (now with health metrics) plus a table of nearby known networks. Phases 4-6 layer
+/// score/decision-log columns onto the same tables.
 struct InspectorView: View {
     @Environment(AppState.self) private var state
 
@@ -13,6 +14,7 @@ struct InspectorView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     CurrentConnectionCard()
+                    HealthCard()
                     KnownInRangeSection()
                     AllInRangeSection()
                 }
@@ -33,7 +35,14 @@ private struct HeaderBar: View {
 
             Spacer()
 
-            if let when = state.lastRefreshedAt {
+            Text(cadenceLabel)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(.quaternary, in: Capsule())
+
+            if let when = state.scan.lastScannedAt {
                 Text("Updated \(when.formatted(date: .omitted, time: .standard))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -41,19 +50,18 @@ private struct HeaderBar: View {
             }
 
             Button {
-                Task { await state.refresh() }
+                Task { await state.refreshNow() }
             } label: {
-                if state.isRefreshing {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
+                Label("Refresh", systemImage: "arrow.clockwise")
             }
-            .disabled(state.isRefreshing)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .background(.bar)
+    }
+
+    private var cadenceLabel: String {
+        "scan: \(state.scan.cadence.label) (\(state.scan.cadence.interval.humanShort))"
     }
 }
 
@@ -69,7 +77,7 @@ private struct CurrentConnectionCard: View {
                     .font(.headline)
             }
 
-            let snap = state.snapshot
+            let snap = state.scan.snapshot
             if let ssid = snap.currentSSID {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 24, verticalSpacing: 6) {
                     row("SSID", ssid)
@@ -78,7 +86,7 @@ private struct CurrentConnectionCard: View {
                     row("Channel", snap.currentChannel.map(String.init) ?? "—")
                     row("Band", snap.currentBand?.rawValue ?? "—")
                 }
-            } else if let err = state.lastError {
+            } else if let err = state.scan.lastError {
                 Text(err).foregroundStyle(.red).font(.callout)
             } else {
                 Text("Not connected to a Wi-Fi network.")
@@ -104,6 +112,73 @@ private struct CurrentConnectionCard: View {
     }
 }
 
+private struct HealthCard: View {
+    @Environment(AppState.self) private var state
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(.tint)
+                Text("Connection health")
+                    .font(.headline)
+                Spacer()
+                Text(state.health.lastSample.measuredAt.formatted(date: .omitted, time: .standard))
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.tertiary)
+            }
+
+            let h = state.health.lastSample
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 24, verticalSpacing: 6) {
+                row("Latency", latencyLabel(h.latencyMillis), tint: latencyColor(h.latencyMillis))
+                row("Connectivity", h.dnsSuccess ? "OK" : "down", tint: h.dnsSuccess ? .green : .red)
+                row("Captive portal", state.captiveVerdict.map { $0.captive ? "yes" : "no" } ?? "not yet probed", tint: state.captiveVerdict?.captive == true ? .red : .secondary)
+                row("Path type", pathLabel(expensive: h.isExpensive, constrained: h.isConstrained, connected: h.isConnected), tint: .secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    @ViewBuilder
+    private func row(_ label: String, _ value: String, tint: Color) -> some View {
+        GridRow {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .gridColumnAlignment(.leading)
+            Text(value)
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(tint)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func latencyLabel(_ ms: Double?) -> String {
+        guard let ms else { return "—" }
+        return String(format: "%.0f ms", ms)
+    }
+
+    private func latencyColor(_ ms: Double?) -> Color {
+        guard let ms else { return .secondary }
+        switch ms {
+        case ..<50: return .green
+        case ..<150: return .yellow
+        case ..<400: return .orange
+        default: return .red
+        }
+    }
+
+    private func pathLabel(expensive: Bool, constrained: Bool, connected: Bool) -> String {
+        if !connected { return "no network path" }
+        var labels: [String] = ["connected"]
+        if expensive { labels.append("metered") }
+        if constrained { labels.append("low-data mode") }
+        return labels.joined(separator: ", ")
+    }
+}
+
 private struct KnownInRangeSection: View {
     @Environment(AppState.self) private var state
 
@@ -114,16 +189,16 @@ private struct KnownInRangeSection: View {
                     .foregroundStyle(.green)
                 Text("Known networks in range")
                     .font(.headline)
-                Text("(\(state.snapshot.knownInRange.count))")
+                Text("(\(state.scan.snapshot.knownInRange.count))")
                     .foregroundStyle(.secondary)
             }
-            if state.snapshot.knownInRange.isEmpty {
+            if state.scan.snapshot.knownInRange.isEmpty {
                 Text("No known networks visible right now.")
                     .foregroundStyle(.secondary)
                     .font(.callout)
                     .padding(.vertical, 6)
             } else {
-                CandidateTable(candidates: state.snapshot.knownInRange)
+                CandidateTable(candidates: state.scan.snapshot.knownInRange)
             }
         }
     }
@@ -134,13 +209,13 @@ private struct AllInRangeSection: View {
 
     var body: some View {
         DisclosureGroup {
-            CandidateTable(candidates: state.snapshot.allInRange)
+            CandidateTable(candidates: state.scan.snapshot.allInRange)
                 .padding(.top, 8)
         } label: {
             HStack {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .foregroundStyle(.secondary)
-                Text("All networks visible (\(state.snapshot.allInRange.count))")
+                Text("All networks visible (\(state.scan.snapshot.allInRange.count))")
                     .font(.headline)
             }
         }
@@ -194,5 +269,13 @@ private struct CandidateTable: View {
         case ..<(-60): return .yellow
         default: return .green
         }
+    }
+}
+
+private extension Duration {
+    var humanShort: String {
+        let secs = Double(self.components.seconds)
+        if secs < 60 { return String(format: "%.0fs", secs) }
+        return String(format: "%.0fm", secs / 60)
     }
 }

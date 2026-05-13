@@ -80,6 +80,74 @@ public struct Candidate: Sendable, Hashable, Identifiable {
     }
 }
 
+/// A single health measurement of the *currently associated* network. The Decision engine
+/// combines this with smoothed RSSI to produce the composite score.
+///
+/// `latencyMillis`, `dnsSuccess`, and `captiveDetected` are the three primary signals;
+/// `isExpensive` / `isConstrained` come straight from `NWPath` and let HEAL-04 (don't
+/// probe over cellular tether) trigger upstream.
+public struct HealthSample: Sendable, Hashable {
+    public let latencyMillis: Double?
+    public let dnsSuccess: Bool
+    public let captiveDetected: Bool
+    public let isExpensive: Bool
+    public let isConstrained: Bool
+    public let isConnected: Bool
+    public let measuredAt: Date
+
+    public init(
+        latencyMillis: Double?,
+        dnsSuccess: Bool,
+        captiveDetected: Bool,
+        isExpensive: Bool,
+        isConstrained: Bool,
+        isConnected: Bool,
+        measuredAt: Date
+    ) {
+        self.latencyMillis = latencyMillis
+        self.dnsSuccess = dnsSuccess
+        self.captiveDetected = captiveDetected
+        self.isExpensive = isExpensive
+        self.isConstrained = isConstrained
+        self.isConnected = isConnected
+        self.measuredAt = measuredAt
+    }
+
+    public static let pending = HealthSample(
+        latencyMillis: nil,
+        dnsSuccess: false,
+        captiveDetected: false,
+        isExpensive: false,
+        isConstrained: false,
+        isConnected: false,
+        measuredAt: .distantPast
+    )
+}
+
+/// SCAN-03: the canonical identity of a Wi-Fi observation is `(SSID, BSSID, band, channel)`.
+/// Same SSID on 2.4 GHz vs 5 GHz is two distinct candidates because backhaul quality and
+/// interference profiles differ per band; same SSID on different APs (different BSSIDs) is
+/// also two distinct candidates because the physical AP matters.
+public struct CandidateKey: Sendable, Hashable, Codable {
+    public let ssid: String
+    public let bssid: String?
+    public let band: WiFiBand
+    public let channel: Int
+
+    public init(ssid: String, bssid: String?, band: WiFiBand, channel: Int) {
+        self.ssid = ssid
+        self.bssid = bssid
+        self.band = band
+        self.channel = channel
+    }
+}
+
+extension ScanResult {
+    public var candidateKey: CandidateKey {
+        CandidateKey(ssid: ssid, bssid: bssid, band: band, channel: channel)
+    }
+}
+
 /// A snapshot of "what's the WiFi situation right now?" — rendered into the main window.
 public struct WiFiSnapshot: Sendable {
     public let currentSSID: String?
