@@ -28,6 +28,8 @@
 	<string>NSApplication</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>LSUIElement</key>
+	<true/>
 	<key>NSLocationUsageDescription</key>
 	<string>auto-wifi reads nearby Wi-Fi networks so it can pick the best known one. macOS requires Location access to expose Wi-Fi network names.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

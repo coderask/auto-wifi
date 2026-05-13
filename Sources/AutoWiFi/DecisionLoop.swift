@@ -29,6 +29,11 @@ public final class DecisionLoop {
     public private(set) var log: [Decision] = []
     public var config: AlgorithmConfig = .default
 
+    /// Provider closure — DecisionLoop calls this each tick to pull the current per-network
+    /// preferences map. AppState wires this to its own networkPreferences. Decoupled this way
+    /// so the loop has no direct dependency on AppState.
+    public var preferencesProvider: () -> [String: NetworkPreference] = { [:] }
+
     /// Live `(SSID, BSSID)` of the previous tick. We use this to detect manual joins:
     /// a link change with no corresponding recent `SwitchActor` attempt is the user joining
     /// a network themselves (SW-02).
@@ -111,7 +116,7 @@ public final class DecisionLoop {
             currentKey: currentKey,
             currentRSSI: snap.currentRSSI,
             health: healthSample,
-            preferences: [:],  // BG-04 (Phase 7) will populate this from SwiftData.
+            preferences: preferencesProvider(),
             captiveFlags: captiveFlags,
             now: Date()
         )

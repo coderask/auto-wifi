@@ -8,14 +8,26 @@ struct AutoWiFiApp: App {
     @State private var appState = AppState()
 
     var body: some Scene {
-        WindowGroup("auto-wifi") {
+        // MenuBarExtra is always present and is the primary surface (UI-01, UI-06).
+        // The main window is opened on demand from the menu or appears automatically when
+        // onboarding is needed.
+        MenuBarExtra {
+            MenuBarContent()
+                .environment(auth)
+                .environment(appState)
+        } label: {
+            MenuBarTitle()
+                .environment(auth)
+                .environment(appState)
+        }
+        .menuBarExtraStyle(.window)
+
+        WindowGroup("auto-wifi", id: "main") {
             RootView()
                 .environment(auth)
                 .environment(appState)
-                .frame(minWidth: 720, minHeight: 540)
+                .frame(minWidth: 760, minHeight: 600)
                 .task {
-                    // Only start the long-running scanners once authorization is granted.
-                    // Otherwise scan results return redacted SSIDs and everything looks broken.
                     if auth.state == .authorized {
                         await appState.start()
                     }
@@ -29,26 +41,39 @@ struct AutoWiFiApp: App {
                 }
         }
         .windowResizability(.contentSize)
+
+        Window("Settings", id: "settings") {
+            SettingsView()
+                .environment(appState)
+        }
+        .windowResizability(.contentSize)
     }
 }
 
-/// Forces the app to a foreground (`.regular`) activation policy and brings it to the front
-/// on launch. Without this, a hand-built `.app` bundle (no `.xcodeproj`, ad-hoc signed) often
-/// launches with its window visible but the app inactive — meaning clicks land on
-/// "activate the app" rather than on the button under the cursor. Two clicks would work;
-/// the user reasonably expects one.
+/// LSUIElement=true plus this delegate gives us: no Dock icon (the menubar item is the
+/// primary surface), but the main window still comes up on first launch so onboarding works.
+/// Without `.regular` policy here, system-modal dialogs (Location prompt, file pickers) can
+/// fail to come to the front.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Force regular activation policy during launch so the onboarding window and
+        // permission prompts come to the foreground. Phase 7 may switch to `.accessory`
+        // post-auth for a more menubar-pure experience.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.async {
-            NSApp.windows.first?.makeKeyAndOrderFront(nil)
+            // The first window in `NSApp.windows` may be the MenuBarExtra status item's
+            // anchor window — find the regular main window and key it.
+            for window in NSApp.windows where window.isVisible && window.canBecomeMain {
+                window.makeKeyAndOrderFront(nil)
+                break
+            }
         }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        // Phase 1 has no menubar item yet (Phase 6), so closing the window should quit.
-        // Phases 6+ will return false so the menubar surface keeps the app alive.
-        true
+        // UI-06: closing the window must NOT quit the app — the menubar surface keeps it
+        // running. User quits explicitly via the menubar.
+        false
     }
 }

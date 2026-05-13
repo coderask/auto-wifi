@@ -17,6 +17,11 @@ public final class AppState {
     public let guards = GuardState()
     public let decisions = DecisionLoop()
 
+    /// UI-05: per-network preference (prefer / avoid / never-auto-join). In-memory in Phase 6;
+    /// SwiftData-backed in Phase 7. The DecisionLoop reads from this map every tick via the
+    /// preferences-provider closure set in `attach()`.
+    public var networkPreferences: [String: NetworkPreference] = [:]
+
     public private(set) var isRunning = false
     public private(set) var captiveVerdict: CaptiveProbe.Verdict?
     private var captiveTask: Task<Void, Never>?
@@ -26,6 +31,15 @@ public final class AppState {
 
     public init() {
         decisions.attach(scan: scan, health: health, captive: captive, guards: guards, traffic: traffic)
+        decisions.preferencesProvider = { [weak self] in self?.networkPreferences ?? [:] }
+    }
+
+    public func setPreference(_ pref: NetworkPreference, for ssid: String) {
+        if pref == .neutral {
+            networkPreferences.removeValue(forKey: ssid)
+        } else {
+            networkPreferences[ssid] = pref
+        }
     }
 
     public func start() async {
