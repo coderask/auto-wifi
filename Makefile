@@ -24,7 +24,7 @@ build:
 	swift build
 
 test:
-	swift test
+	swift run AlgorithmsRunner
 
 app:
 	./Scripts/make-app.sh debug

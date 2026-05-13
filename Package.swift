@@ -14,20 +14,27 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AutoWiFi",
-            dependencies: ["Core"],
+            dependencies: ["Core", "Algorithms"],
             path: "Sources/AutoWiFi"
         ),
         .target(
             name: "Algorithms",
+            dependencies: ["Core"],
             path: "Sources/Algorithms"
         ),
         .target(
             name: "Core",
             path: "Sources/Core"
         ),
-        // NOTE: AlgorithmsTests target intentionally omitted until Xcode is installed.
-        // Command Line Tools doesn't ship XCTest or swift-testing. Phase 3 will reinstate
-        // a `.testTarget` using Swift Testing per ARCHITECTURE.md "Pattern 5".
+        // CLT doesn't ship XCTest or swift-testing, so the Algorithms tests run as a plain
+        // executable target instead. `swift run AlgorithmsRunner` produces pass/fail output
+        // and exits non-zero on failure (so it slots cleanly into `make test`). Phase 3
+        // will reinstate a real `.testTarget` once Xcode is installed.
+        .executableTarget(
+            name: "AlgorithmsRunner",
+            dependencies: ["Algorithms", "Core"],
+            path: "Tests/AlgorithmsRunner"
+        ),
     ],
     swiftLanguageModes: [.v6]
 )
